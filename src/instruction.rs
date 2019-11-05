@@ -1,6 +1,13 @@
 #[derive(Debug, PartialEq)]
 pub enum Opcode {
+    LOAD,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
     HLT,
+    JMP,
+    JMPF,
     IGL,
 }
 
@@ -36,7 +43,7 @@ mod tests {
 
     #[test]
     fn test_create_instruction() {
-      let instruction = Instruction::new(Opcode::HLT);
-      assert_eq!(instruction.opcode, Opcode::HLT);
+        let instruction = Instruction::new(Opcode::HLT);
+        assert_eq!(instruction.opcode, Opcode::HLT);
     }
 }
