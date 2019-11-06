@@ -5,9 +5,11 @@ pub enum Opcode {
     SUB,
     MUL,
     DIV,
+    EQ,
     HLT,
     JMP,
     JMPF,
+    JEQ,
     IGL,
 }
 
