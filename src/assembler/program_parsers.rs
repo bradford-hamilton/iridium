@@ -1,10 +1,10 @@
-use crate::assembler::instruction_parsers::{AssemblerInstruction, instruction_one};
+use crate::assembler::instruction_parsers::{instruction_one, AssemblerInstruction};
 
 use nom::types::CompleteStr;
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
-    instructions: Vec<AssemblerInstruction>
+    instructions: Vec<AssemblerInstruction>,
 }
 
 impl Program {
@@ -40,10 +40,7 @@ mod tests {
         assert_eq!(result.is_ok(), true);
         let (leftover, p) = result.unwrap();
         assert_eq!(leftover, CompleteStr(""));
-        assert_eq!(
-            1,
-            p.instructions.len()
-        );
+        assert_eq!(1, p.instructions.len());
         // TODO: Figure out an ergonomic way to test the AssemblerInstruction returned
     }
 

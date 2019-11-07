@@ -17,6 +17,16 @@ named!(pub integer_operand<CompleteStr, Token>,
     )
 );
 
+named!(pub operand<CompleteStr, Token>,
+    alt!(
+        integer_operand |
+        float_operand |
+        label_usage |
+        register |
+        irstring
+    )
+);
+
 mod tests {
     #![allow(unused_imports)]
     use super::*;
