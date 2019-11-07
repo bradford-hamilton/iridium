@@ -93,7 +93,7 @@ impl VM {
                 }
                 self.next_8_bits();
             }
-            Opcode::JEQ => {
+            Opcode::JMPE => {
                 let register = self.next_8_bits() as usize;
                 let target = self.registers[register];
                 if self.equal_flag {
