@@ -5,7 +5,7 @@ use crate::assembler::Token;
 
 /// Parser for integer numbers, which we preface with `#` in our assembly language:
 /// #100
-named!(integer_operand<CompleteStr, Token>,
+named!(pub integer_operand<CompleteStr, Token>,
     ws!(
         do_parse!(
             tag!("#") >>
