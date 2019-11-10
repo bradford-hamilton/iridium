@@ -9,7 +9,7 @@ use nom::types::CompleteStr;
 
 #[derive(Debug, PartialEq)]
 pub struct AssemblerInstruction {
-    pub opcode: Token,
+    pub opcode: Option<Token>,
     pub label: Option<Token>,
     pub directive: Option<Token>,
     pub operand1: Option<Token>,
@@ -18,27 +18,26 @@ pub struct AssemblerInstruction {
 }
 
 impl AssemblerInstruction {
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut results = vec![];
-
-        match self.opcode {
-            Token::Op { code } => match code {
+    pub fn to_bytes(&self, symbols: &SymbolTable) -> Vec<u8> {
+        let mut results: Vec<u8> = vec![];
+        if let Some(ref token) = self.opcode {
+            match token {
+                Token::Op { code } => match code {
+                    _ => {
+                        let b: u8 = (*code).into();
+                        results.push(b);
+                    }
+                },
                 _ => {
-                    results.push(code as u8);
+                    println!("Non-opcode found in opcode field");
                 }
-            },
-            _ => {
-                println!("Non-opcode found in opcode field");
-                std::process::exit(1);
-            }
-        };
-
-        for operand in vec![&self.operand1, &self.operand2, &self.operand3] {
-            if let Some(token) = operand {
-                AssemblerInstruction::extract_operand(token, &mut results)
             }
         }
-
+        for operand in &[&self.operand1, &self.operand2, &self.operand3] {
+            if let Some(token) = operand {
+                AssemblerInstruction::extract_operand(token, &mut results, symbols);
+            }
+        }
         while results.len() < 4 {
             results.push(0);
         }
@@ -46,22 +45,29 @@ impl AssemblerInstruction {
         results
     }
 
-    fn extract_operand(t: &Token, results: &mut Vec<u8>) {
+    fn extract_operand(t: &Token, results: &mut Vec<u8>, symbols: &SymbolTable) {
         match t {
             Token::Register { reg_num } => {
                 results.push(*reg_num);
             }
             Token::IntegerOperand { value } => {
-                let converted = *value as u16;
-                let byte1 = converted;
-                let byte2 = converted >> 8;
-
-                results.push(byte2 as u8);
-                results.push(byte1 as u8);
+                let mut wtr = vec![];
+                wtr.write_i16::<LittleEndian>(*value as i16).unwrap();
+                results.push(wtr[1]);
+                results.push(wtr[0]);
+            }
+            Token::LabelUsage { name } => {
+                if let Some(value) = symbols.symbol_value(name) {
+                    let mut wtr = vec![];
+                    wtr.write_u32::<LittleEndian>(value).unwrap();
+                    results.push(wtr[1]);
+                    results.push(wtr[0]);
+                } else {
+                    error!("No value found for {:?}", name);
+                }
             }
             _ => {
-                println!("Opcode found in operand field");
-                std::process::exit(1);
+                error!("Opcode found in operand field: {:#?}", t);
             }
         };
     }

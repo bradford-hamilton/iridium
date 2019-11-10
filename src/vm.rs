@@ -1,4 +1,5 @@
 use crate::instruction::Opcode;
+use crate::assembler::{PIE_HEADER_LENGTH, PIE_HEADER_PREFIX};
 
 pub struct VM {
     /// Array that simulates having hardware registers
@@ -13,6 +14,8 @@ pub struct VM {
     equal_flag: bool,
     /// Represents our heap memory
     heap: Vec<u8>,
+    /// Contains the read-only section data
+    ro_data: Vec<u8>,
 }
 
 impl VM {
@@ -24,6 +27,7 @@ impl VM {
             remainder: 0,
             equal_flag: false,
             heap: vec![],
+            ro_data: vec![],
         }
     }
 
@@ -113,6 +117,22 @@ impl VM {
                 let new_end = self.heap.len() as i32 + bytes;
                 self.heap.resize(new_end as usize, 0);
             }
+            Opcode::PRTS => {
+                let starting_offset = self.next_16_bits() as usize;
+                let mut ending_offset = starting_offset;
+                let slice = self.ro_data.as_slice();
+
+                while slice[ending_offset] != 0 {
+                    ending_offset += 1;
+                }
+
+                let result = std::str::from_utf8(&slice[starting_offset..ending_offset]);
+                
+                match result {
+                    Ok(s) => { print!("{}", s); }
+                    Err(e) => { println!("Error decoding string for prts instruction: {:#?}", e) }
+                }
+            }
             _ => {
                 println!("Unrecognized opcode found! Terminating!");
                 return false;
@@ -144,9 +164,14 @@ impl VM {
         self.program.push(b);
     }
 
+    /// Adds an arbitrary byte to the VM's program
+    pub fn add_bytes(&mut self, mut b: Vec<u8>) {
+        self.program.append(&mut b);
+    }
+
     /// Processes the header of bytecode the VM wants to execute
     fn verify_header(&self) -> bool {
-        if self.program[0..4] != PIE_HEADER_PRIFIX {
+        if self.program[0..4] != PIE_HEADER_PREFIX {
             return false;
         }
 

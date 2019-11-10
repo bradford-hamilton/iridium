@@ -17,13 +17,6 @@ named!(pub integer_operand<CompleteStr, Token>,
     )
 );
 
-// named!(pub operand<CompleteStr, Token>,
-//     alt!(
-//         integer_operand |
-//         register
-//     )
-// );
-
 named!(pub operand<CompleteStr, Token>,
     alt!(
         integer_operand |
@@ -38,7 +31,7 @@ named!(irstring<CompleteStr, Token>,
         content: take_until!("'") >>
         tag!("'") >>
         (
-            Token::IrString{ name: content.to_string() }
+            Token::IrString { name: content.to_string() }
         )
     )
 );

@@ -1,5 +1,8 @@
 use crate::instruction::Opcode;
 use crate::assembler::program_parsers::program;
+use crate::assembler::instruction_parsers::AssemblerInstruction;
+use crate::assembler::assembler_errors::AssemblerError;
+use crate::assembler::program_parsers::Program;
 
 use nom::types::CompleteStr;
 
@@ -9,9 +12,10 @@ pub mod operand_parsers;
 pub mod program_parsers;
 pub mod register_parsers;
 pub mod label_parsers;
+pub mod assembler_errors;
 
-const PIE_HEADER_PREFIX: [u8; 4] = [45, 50, 49, 45];
-const PIE_HeADER_LENGTH: usize = 64;
+pub const PIE_HEADER_PREFIX: [u8; 4] = [45, 50, 49, 45];
+pub const PIE_HEADER_LENGTH: usize = 64;
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -21,6 +25,7 @@ pub enum Token {
     LabelDeclaration { name: String },
     LabelUsage { name: String },
     Directive { name: String },
+    IrString { name: String },
 }
 
 pub struct Symbol {
@@ -91,8 +96,15 @@ pub struct Assembler {
 impl Assembler {
     pub fn new() -> Assembler {
         Assembler {
+            current_instruction: 0,
+            ro_offset: 0,
+            ro: vec![],
+            bytecode: vec![],
+            sections: vec![],
+            errors: vec![],
             phase: AssemblerPhase::First,
             symbols: SymbolTable::new(),
+            current_section: None,
         }
     }
 
@@ -169,8 +181,67 @@ impl Assembler {
         self.symbols.add_symbol(symbol);
     }
 
+    /// Runs the second pass of the assembler
     fn process_second_phase(&mut self, p: &Program) -> Vec<u8> {
-        // start back here
+        self.current_instruction = 0;
+
+        let mut program = vec![];
+
+        for i in &p.instructions {
+            if i.is_opcode() {
+                let mut bytes = i.to_bytes(&self.symbols);
+                program.append(&mut bytes);
+            }
+
+            if i.is_directive() {
+                self.process_directive(i);
+            }
+
+            self.current_instruction += 1;
+        }
+
+        program
+    }
+    
+    /// Handles a declaration of a section header, such as: .code
+    fn process_section_header(&mut self, header_name: &str) -> {
+        let new_section: AssemblerSection = header_name.into();
+
+        if new_section == AssemblerSection::Unknown {
+            println!("Found an section header that is unknown: {:#?}", header_name);
+            return;
+        }
+
+        self.sections.push(new_section.clone());
+        self.current_section = Some(new_section);
+    }
+
+    /// Handles a declaration of a null-terminated string: hello: .asciiz 'Hello!'
+    fn handle_asciiz(&mut self, i: &AssemblerInstruction) {
+        if self.phase != AssemblerPhase::First { return; }
+
+        match i.get_string_constant() {
+            Some(s) => {
+                match i.get_label_name() {
+                    Some(name) => { self.symbols.set_symbol_offset(&name, self.ro_offset); }
+                    None => {
+                        println!("Found a string constant with no associated label!");
+                        return;
+                    }
+                };
+
+                for byte in s.as_bytes() {
+                    self.ro.push(*byte);
+                    self.ro_offset += 1;
+                }
+
+                self.ro.push(0);
+                self.ro_offset += 1;
+            }
+            None => {
+                println!("String constant following an .asciiz was empty");
+            }
+        }
     }
 
     fn extract_labels(&mut self, p: &Program) {
@@ -197,7 +268,7 @@ impl Assembler {
             header.push(byte.clone());
         }
 
-        while header.len() <= PIE_HeADER_LENGTH {
+        while header.len() <= PIE_HEADER_LENGTH {
             header.push(0 as u8);
         }
 
@@ -205,6 +276,40 @@ impl Assembler {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum AssemblerPhase {
+    First,
+    Second,
+}
+
+impl Default for AssemblerPhase {
+    fn default() -> Self {
+        AssemblerPhase::First
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum AssemblerSection {
+    Data { starting_instruction: Option<u32> },
+    Code { starting_instruction: Option<u32> },
+    Unknown,
+}
+
+impl Default for AssemblerSection {
+    fn default() -> Self {
+        AssemblerSection::Unknown
+    }
+}
+
+impl<'a> From<&'a str> for AssemblerSection {
+    fn from(name: &str) -> AssemblerSection {
+        match name {
+            "data" => AssemblerSection::Data { starting_instruction: None },
+            "code" => AssemblerSection::Code { starting_instruction: None },
+            _ => AssemblerSection::Unknown,
+        }
+    }
+}
 
 mod tests {
     #![allow(unused_imports)]

@@ -27,7 +27,7 @@ fn main() {
 
             match program {
                 Some(p) => {
-                    vm.add_bytes();
+                    vm.add_bytes(p);
                     vm.run();
                     std::process::exit(0);
                 }
