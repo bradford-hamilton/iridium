@@ -11,6 +11,8 @@ pub struct VM {
     remainder: usize,
     /// Contains the result of the last comparison operation
     equal_flag: bool,
+    /// Represents our heap memory
+    heap: Vec<u8>,
 }
 
 impl VM {
@@ -21,6 +23,7 @@ impl VM {
             pc: 0,
             remainder: 0,
             equal_flag: false,
+            heap: vec![],
         }
     }
 
@@ -49,7 +52,7 @@ impl VM {
         // If our program counter has exceeded the length
         // of the program itself, something has gone awry
         if self.pc >= self.program.len() {
-            return false;
+            return true;
         }
 
         match self.decode_opcode() {
@@ -62,7 +65,11 @@ impl VM {
             }
             Opcode::HLT => {
                 println!("HLT encountered");
-                return false;
+                return true;
+            }
+            Opcode::IGL => {
+                println!("Illegal instruction encountered");
+                return true;
             }
             Opcode::ADD => {
                 let register1 = self.registers[self.next_8_bits() as usize];
@@ -100,13 +107,19 @@ impl VM {
                     self.pc = target as usize;
                 }
             }
+            Opcode::ALOC => {
+                let register = self.next_8_bits() as usize;
+                let bytes = self.registers[register];
+                let new_end = self.heap.len() as i32 + bytes;
+                self.heap.resize(new_end as usize, 0);
+            }
             _ => {
                 println!("Unrecognized opcode found! Terminating!");
                 return false;
             }
         }
 
-        true
+        false
     }
 
     fn decode_opcode(&mut self) -> Opcode {
@@ -129,6 +142,15 @@ impl VM {
 
     pub fn add_byte(&mut self, b: u8) {
         self.program.push(b);
+    }
+
+    /// Processes the header of bytecode the VM wants to execute
+    fn verify_header(&self) -> bool {
+        if self.program[0..4] != PIE_HEADER_PRIFIX {
+            return false;
+        }
+
+        true
     }
 }
 
@@ -208,5 +230,35 @@ mod tests {
         test_vm.program = vec![16, 0, 0, 0, 17, 0, 0, 0, 17, 0, 0, 0];
         test_vm.run_once();
         assert_eq!(test_vm.pc, 7);
+    }
+
+    #[test]
+    fn test_aloc_opcode() {
+        let mut test_vm = VM::get_test_vm();
+        test_vm.registers[0] = 1024;
+        test_vm.program = vec![17, 0, 0, 0];
+        test_vm.run_once();
+        assert_eq!(test_vm.heap.len(), 1024);
+    }
+
+    fn prepend_header(mut b: Vec<u8>) -> Vec<u8> {
+        let mut prepension = vec![];
+        for byte in PIE_HEADER_PREFIX.into_iter() {
+            prepension.push(byte.clone());
+        }
+        while prepension.len() <= PIE_HEADER_LENGTH {
+            prepension.push(0);
+        }
+        prepension.append(&mut b);
+        prepension
+    }
+
+    #[test]
+    fn test_mul_opcode() {
+        let mut test_vm = VM::get_test_vm();
+        test_vm.program = vec![3, 0, 1, 2];
+        test_vm.program = prepend_header(test_vm.program);
+        test_vm.run();
+        assert_eq!(test_vm.registers[2], 50);
     }
 }

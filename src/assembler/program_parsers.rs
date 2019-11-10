@@ -1,4 +1,4 @@
-use crate::assembler::instruction_parsers::{instruction_one, AssemblerInstruction};
+use crate::assembler::instruction_parsers::{instruction_combined, AssemblerInstruction};
 
 use nom::types::CompleteStr;
 
@@ -21,7 +21,7 @@ impl Program {
 
 named!(pub program<CompleteStr, Program>,
     do_parse!(
-        instructions: many1!(instruction_one) >>
+        instructions: many1!(instruction_combined) >>
         (
             Program {
                 instructions: instructions
@@ -52,5 +52,12 @@ mod tests {
         let bytecode = program.to_bytes();
         assert_eq!(bytecode.len(), 4);
         println!("{:?}", bytecode);
+    }
+
+    #[test]
+    fn test_complete_program() {
+        let test_program = CompleteStr(".data\nhello: .asciiz 'Hello everyone!'\n.code\nhlt");
+        let result = program(test_program);
+        assert_eq!(result.is_ok(), true);
     }
 }

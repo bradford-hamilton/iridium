@@ -1,6 +1,6 @@
 use nom::digit;
 use nom::types::CompleteStr;
-
+use crate::assembler::register_parsers::register;
 use crate::assembler::Token;
 
 /// Parser for integer numbers, which we preface with `#` in our assembly language:
@@ -17,13 +17,29 @@ named!(pub integer_operand<CompleteStr, Token>,
     )
 );
 
+// named!(pub operand<CompleteStr, Token>,
+//     alt!(
+//         integer_operand |
+//         register
+//     )
+// );
+
 named!(pub operand<CompleteStr, Token>,
     alt!(
         integer_operand |
-        float_operand |
-        label_usage |
         register |
         irstring
+    )
+);
+
+named!(irstring<CompleteStr, Token>,
+    do_parse!(
+        tag!("'") >>
+        content: take_until!("'") >>
+        tag!("'") >>
+        (
+            Token::IrString{ name: content.to_string() }
+        )
     )
 );
 
@@ -43,5 +59,11 @@ mod tests {
         // Test an invalid one (missing the #)
         let result = integer_operand(CompleteStr("10"));
         assert_eq!(result.is_ok(), false);
+    }
+
+    #[test]
+    fn test_parse_string_operand() {
+        let result = irstring(CompleteStr("'This is a test'"));
+        assert_eq!(result.is_ok(), true);
     }
 }
